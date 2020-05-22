@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-import hashlib
 import logging
+import random
 import re
+import string
+import traceback
 
 from bs4 import BeautifulSoup
 from scrapy import Request
@@ -12,17 +14,31 @@ from CommoditySpider.items import *
 class MercadoLivreSpider(scrapy.Spider):
     name = "mercado_livre"
     start_urls = [
-        # 'https://www.mercadolivre.com.br/menu/departments'
-        'https://www.mercadolivre.com.br/categories.html#menu=categories'
+        'https://www.mercadolivre.com.br/categorias#menu=categories'
     ]
     allowed_domain = ['mercadolivre.com.br']
 
     def start_requests(self):
         for url in self.start_urls:
-            yield Request(url=url, callback=self.parse_departments, dont_filter=True)
+            yield Request(url=url, callback=self.parse_departments, dont_filter=True, errback=self.errback_httpbin)
 
-    def parse(self, response):
-        pass
+    def errback_httpbin(self, failure):
+        self.logger.error(repr(failure))
+
+    def generate_id(self, len=7):
+        return ''.join(random.sample(string.digits + string.ascii_uppercase, len))
+
+    def generate_classify(self, id, name, url):
+        classify = ClassifyItem()
+        classify['id'] = id
+        classify['name'] = name
+        classify['url'] = url
+        classify['type'] = 'mercado'
+        return classify
+
+    target_first_categorys = ['Acessórios para Veículos', 'Casa, Móveis e Decoração', 'Eletrodomésticos']
+    # 需要爬取的目标分类
+    target_categorys = ['Banheiros']
 
     def parse_departments(self, response):
         """
@@ -31,92 +47,89 @@ class MercadoLivreSpider(scrapy.Spider):
         :return: 返回解析之后的所有商品分类数据，层级关系。
         """
         soup = BeautifulSoup(response.text, 'lxml')
-        for span in soup.find_all('span', class_='ch-g1-3'):
-            item_a = span.find('a')
-            # 'Mochilas', 'Malas e Carteiras', 'Bolsas' 已爬取
-            words = [
-                'Acessórios para Áudio e Vídeo',
-                'Fones de Ouvido',
-                'Projetores e Telas',
-                'Segurança para Casa',
-                'Maquiagem',
-                'Acessórios para Celulares'
-            ]
-            if item_a['title'] in words:
-                title = item_a['title']
-                classify = ClassifyItem()
-                cls_id = hashlib.md5(title.encode(encoding='UTF-8')).hexdigest()
-                classify['cid'] = cls_id
-                classify['name'] = title
-                classify['url'] = item_a['href']
-                classify['count'] = re.findall('\\d+', span.text)[0]
-                classify['type'] = 'mercado'
-                yield classify
-                yield Request(url=item_a['href'], callback=self.parse_content, meta={
-                    'cls_id': cls_id
-                }, dont_filter=True)
+        for categorys in soup.find_all('div', class_='categories__container'):
+            first_category = categorys.find('a', class_='categories__title')
+            if str(first_category.text).strip() in self.target_first_categorys:
+                yield self.generate_classify(self.generate_id(), first_category.text, first_category['href'])
+                second_categorys = categorys.find_all('a', class_='categories__subtitle')
+                for second_category in second_categorys:
+                    id = self.generate_id(11)
+                    url = second_category['href']
+                    # if str(second_category.text).strip() in self.target_categorys:
+                    yield self.generate_classify(id, second_category.text, url)
+                    yield Request(url=url, callback=self.parse_content, meta={
+                        'cls_id': id
+                    }, dont_filter=True)
 
     def parse_content(self, response):
         soup = BeautifulSoup(response.text, 'lxml')
+        try:
+            ol = soup.find('ol', id='searchResults')
+            if not ol is None:
+                # 查询列表所有的商品数据
+                ol_results = ol.find_all('li', class_=re.compile('results-item'))
+                for li in ol_results:
+                    try:
+                        div_tag = li.find('div', class_='images-viewer')
+                        img_tag = div_tag.find('img')
+                        # thumbnail = img_tag['src' if ''.join(img_tag['class']) == 'lazy-load' else 'data-src']
+                        show_url = div_tag['item-url']
+                        data = {
+                            'meta': response.meta,
+                            'show_url': show_url,
+                            'thumbnail': ''
+                        }
+                        yield Request(url=show_url, callback=self.parse_detail, meta=data, dont_filter=True)
+                    except Exception as e:
+                        logging.error('mercado parse content exception:', e.args)
+                next = soup.find('link', class_='andes-pagination__link', rel='next')
+                if next is not None:
+                    yield Request(url=next['href'], callback=self.parse_content, meta=response.meta, dont_filter=True)
+        except Exception:
+            logging.error('AAA解析发生错误的链接：%s' % response.meta.get('url'))
+            traceback.print_exc()
 
-        # 查询所有的商品数据
-        result_items = soup.find_all('li', class_=re.compile('results-item'))
-        for result_item in result_items:
-            try:
-                id = result_item.find('div', class_='images-viewer')['item-id']
-                condition = result_item.find('div', class_='item__condition').text
-                location = condition.split('-')[1].strip() if '-' in condition else ''
-                thumbnail = ''
-                img_tag = result_item.find('img', class_='lazy-load')
-                if img_tag is None:
-                    img_id_tag = result_item.find('img', id=re.compile(id))
-                    if img_id_tag is not None:
-                        thumbnail = img_id_tag['data-src']
-                else:
-                    img_lazy_tag = result_item.find('img', class_='lazy-load')
-                    if img_lazy_tag is not None:
-                        thumbnail = img_lazy_tag['src']
-                detail_url = result_item.find('a', class_=re.compile('item__js-link'))['href']
-                data = {
-                    'meta': response.meta,
-                    'good_id': id,
-                    'location': location,
-                    'thumbnail': thumbnail,
-                    'show_url': detail_url
-                }
-                yield Request(url=detail_url, callback=self.parse_detail, meta=data, dont_filter=True)
-            except Exception as e:
-                logging.error('mercado parse content exception:', e.args)
+    count = 1
 
-        next = soup.find('link', class_='andes-pagination__link', rel='next')
-        if next is not None:
-            yield Request(url=next['href'], callback=self.parse_content, meta=response.meta, dont_filter=True)
-
-    count = 0
+    def generate_commodity(self, cls_id, id, name, thumbnail, url, price_symbol, price, vendidos, month_vendidos):
+        c = CommodityItem()
+        c['id'] = id
+        c['name'] = name
+        c['vendidos'] = vendidos
+        c['month_vendidos'] = month_vendidos
+        c['price_symbol'] = price_symbol
+        c['price'] = price
+        c['thumbnail'] = thumbnail
+        c['show_url'] = url
+        c['cls_id'] = cls_id
+        print('%s | %s | %s | %s | %s | %s | %s | %s | %s' % (
+            self.count, cls_id, id, name, price_symbol + price, vendidos, month_vendidos, url, thumbnail))
+        self.count += 1
+        return c
 
     def parse_detail(self, response):
         soup = BeautifulSoup(response.text, 'lxml')
         try:
-            data = response.meta
+            meta = response.meta
 
-            c_name = soup.find('h1', class_='item-title__primary').text
-            c_vendidos = soup.find('div', class_='item-conditions').text
-            c_4m_vendidos = soup.find('dd', class_='reputation-relevant').find('strong').text
-            price_tag = soup.find_all('span', class_='price-tag-symbol')[-1]
-
-            commodity = CommodityItem()
-            commodity['cid'] = data.get('good_id')
-            commodity['name'] = str(c_name).strip()
-            commodity['vendidos'] = re.findall('\\d+', c_vendidos)[0] if len(re.findall('\\d+', c_vendidos)) > 0 else 0
-            commodity['month_vendidos'] = c_4m_vendidos
-            commodity['location'] = data.get('location')
-            commodity['price_symbol'] = str(price_tag.text).strip()
-            commodity['price'] = price_tag['content']
-            commodity['thumbnail'] = data.get('thumbnail')
-            commodity['show_url'] = data.get('show_url')
-            commodity['cls_id'] = data.get('meta').get('cls_id')
-            self.count += 1
-            print('-----', self.count, data.get('good_id'), response.url)
-            yield commodity
-        except Exception as e:
-            logging.error('mercado parse detail exception:', e.args)
+            cls_id = meta.get('meta').get('cls_id')
+            inputTag = soup.find('input', attrs={'name': 'itemId'})
+            if not inputTag is None:
+                id = inputTag['value']
+                title = soup.find('h1', class_='item-title__primary')
+                name = str(title.text).strip() if title is not None else '- -'
+                thumbnail = meta.get('thumbnail')
+                url = soup.find('input', attrs={'name': 'itemPermalink'})['value']
+                price_tag = soup.find('span', class_='price-tag').find('span', class_='price-tag-symbol')
+                price_symbol = price_tag.text
+                price = price_tag['content']
+                ven_tag = soup.find('div', class_='item-conditions')
+                vendidos_text = ven_tag.text if ven_tag is not None else '0'
+                vendidos = re.findall('\\d+', vendidos_text)[0] if len(re.findall('\\d+', vendidos_text)) > 0 else 0
+                mon_ven_tag = soup.find('dd', class_='reputation-relevant')
+                month_vendidos = mon_ven_tag.find('strong').text if mon_ven_tag is not None else 0
+                yield self.generate_commodity(cls_id, id, name, thumbnail, url, price_symbol, price, vendidos,
+                                              month_vendidos)
+        except Exception:
+            logging.error('解析发生错误的链接：%s' % response.meta.get('show_url'))
+            traceback.print_exc()

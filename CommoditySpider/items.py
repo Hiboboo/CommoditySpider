@@ -9,11 +9,10 @@ import scrapy
 
 
 class CommodityItem(scrapy.Item):
-    cid = scrapy.Field()
+    id = scrapy.Field()
     name = scrapy.Field()
     vendidos = scrapy.Field()
     month_vendidos = scrapy.Field()
-    location = scrapy.Field()
     price_symbol = scrapy.Field()
     price = scrapy.Field()
     thumbnail = scrapy.Field()
@@ -22,9 +21,8 @@ class CommodityItem(scrapy.Item):
 
 
 class ClassifyItem(scrapy.Item):
-    cid = scrapy.Field()
+    id = scrapy.Field()
     pid = scrapy.Field()
-    count = scrapy.Field()
     name = scrapy.Field()
     url = scrapy.Field()
     type = scrapy.Field()

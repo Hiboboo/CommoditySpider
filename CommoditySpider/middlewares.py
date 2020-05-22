@@ -95,12 +95,12 @@ class CommodityspiderDownloaderMiddleware(object):
         # - or raise IgnoreRequest: process_exception() methods of
         #   installed downloader middleware will be called
 
-        proxy_host = "p20.t.16yun.cn"
-        proxy_port = "6447"
+        proxy_host = "u1256.b5.t.16yun.cn"
+        proxy_port = "6460"
 
         # 代理隧道验证信息
-        proxy_user = "16RHXUTQ"
-        proxy_pass = "093842"
+        proxy_user = "16UTSANJ"
+        proxy_pass = "814459"
 
         request.meta['proxy'] = "http://{0}:{1}".format(proxy_host, proxy_port)
 
