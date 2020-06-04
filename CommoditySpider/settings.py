@@ -56,7 +56,7 @@ ITEM_PIPELINES = {
 }
 
 LOG_LEVEL = 'INFO'
-LOG_FILE = "spider-0522-001.log"
+LOG_FILE = "spider-0604-001.log"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True

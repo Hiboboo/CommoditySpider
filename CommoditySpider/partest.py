@@ -7,6 +7,7 @@
 import random
 import re
 import string
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -81,7 +82,19 @@ def parse_page_show(url, meta):
 
 if __name__ == '__main__':
     # print('所属分类\tID\t名称\t价格\t销量\t月销量\t链接\t图片')
-    parse_page()
+    # parse_page()
     # url = 'https://produto.mercadolivre.com.br/MLB-767152551-torneira-cascata-banheiro-misturador-quadrada-dourada-parana-_JM#position=42&type=item&tracking_id=1318d260-6264-4b28-bfcb-3046062dd545'
     # meta = {"cls_id": '111', 'thumbnail': ""}
     # parse_page_show(url, meta)
+    start_urls = [
+        # 全部分类
+        'https://www.mercadolivre.com.br/categorias#menu=categories',
+        # 搜索指定目标
+        'https://lista.mercadolivre.com.br/vela#D[A:Vela]'
+    ]
+    for url in start_urls:
+        up = urlparse(url)
+        if not re.match('D\\[', up.fragment) is None:
+            print(up.path[1:])
+        else:
+            print(url)
