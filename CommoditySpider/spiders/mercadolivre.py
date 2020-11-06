@@ -75,7 +75,7 @@ class MercadoLivreSpider(scrapy.Spider):
                     }, dont_filter=True)
 
     # 需要爬取的二级分类
-    target_second_categorys = ['Insumos para Fazer Velas']
+    target_second_categorys = ['Periféricos para PC']
 
     def parse_departments_to_second(self, response):
         """
@@ -110,25 +110,24 @@ class MercadoLivreSpider(scrapy.Spider):
     def parse_content(self, response):
         soup = BeautifulSoup(response.text, 'lxml')
         try:
-            ol = soup.find('ol', id='searchResults')
-            if not ol is None:
-                # 查询列表所有的商品数据
-                ol_results = ol.find_all('li', class_=re.compile('results-item'))
-                for li in ol_results:
-                    try:
-                        div_tag = li.find('div', class_='images-viewer')
-                        img_tag = div_tag.find('img')
-                        # thumbnail = img_tag['src' if ''.join(img_tag['class']) == 'lazy-load' else 'data-src']
-                        show_url = div_tag['item-url']
-                        data = {
-                            'meta': response.meta,
-                            'show_url': show_url,
-                            'thumbnail': ''
-                        }
-                        yield Request(url=show_url, callback=self.parse_detail, meta=data, dont_filter=True)
-                    except Exception as e:
-                        logging.error('mercado parse content exception:', e.args)
-                next = soup.find('link', class_='andes-pagination__link', rel='next')
+            # 查询列表所有的商品数据
+            li_results = soup.find_all('li', class_='ui-search-layout__item')
+            for li in li_results:
+                try:
+                    img_tag = li.find('img', class_='ui-search-result-image__element')
+                    thumbnail = img_tag['data-src'] if img_tag['src'] is None else img_tag['src']
+                    show_url = li.find('a', class_='ui-search-link')['href']
+                    data = {
+                        'meta': response.meta,
+                        'show_url': show_url,
+                        'thumbnail': thumbnail
+                    }
+                    yield Request(url=show_url, callback=self.parse_detail, meta=data, dont_filter=True)
+                except Exception as e:
+                    logging.error('mercado parse content exception:', e.args)
+            li_next_tag = soup.find('li', class_=re.compile('andes-pagination__button--next'))
+            if li_next_tag is not None:
+                next = li_next_tag.find('a')
                 if next is not None:
                     yield Request(url=next['href'], callback=self.parse_content, meta=response.meta, dont_filter=True)
         except Exception:
@@ -159,23 +158,24 @@ class MercadoLivreSpider(scrapy.Spider):
             meta = response.meta
 
             cls_id = meta.get('meta').get('cls_id')
-            inputTag = soup.find('input', attrs={'name': 'itemId'})
-            if not inputTag is None:
-                id = inputTag['value']
-                title = soup.find('h1', class_='item-title__primary')
+            main_tag = soup.find('div', id='root-app')
+            if not main_tag is None:
+                id = main_tag.find('div', class_='ui-pdp-actions__container').find('input', name='item_id')['value']
+                title = soup.find('h1', class_='ui-pdp-title')
                 name = str(title.text).strip() if title is not None else '- -'
                 thumbnail = meta.get('thumbnail')
-                url = soup.find('input', attrs={'name': 'itemPermalink'})['value']
-                price_tag = soup.find('span', class_='price-tag').find('span', class_='price-tag-symbol')
-                price_symbol = price_tag.text
-                price = price_tag['content']
-                ven_tag = soup.find('div', class_='item-conditions')
-                vendidos_text = ven_tag.text if ven_tag is not None else '0'
-                vendidos = re.findall('\\d+', vendidos_text)[0] if len(re.findall('\\d+', vendidos_text)) > 0 else 0
-                mon_ven_tag = soup.find('dd', class_='reputation-relevant')
-                month_vendidos = mon_ven_tag.find('strong').text if mon_ven_tag is not None else 0
-                yield self.generate_commodity(cls_id, id, name, thumbnail, url, price_symbol, price, vendidos,
-                                              month_vendidos)
+                print(id, name, thumbnail)
+                # url = soup.find('input', attrs={'name': 'itemPermalink'})['value']
+                # price_tag = soup.find('span', class_='price-tag').find('span', class_='price-tag-symbol')
+                # price_symbol = price_tag.text
+                # price = price_tag['content']
+                # ven_tag = soup.find('div', class_='item-conditions')
+                # vendidos_text = ven_tag.text if ven_tag is not None else '0'
+                # vendidos = re.findall('\\d+', vendidos_text)[0] if len(re.findall('\\d+', vendidos_text)) > 0 else 0
+                # mon_ven_tag = soup.find('dd', class_='reputation-relevant')
+                # month_vendidos = mon_ven_tag.find('strong').text if mon_ven_tag is not None else 0
+                # yield self.generate_commodity(cls_id, id, name, thumbnail, url, price_symbol, price, vendidos,
+                #                               month_vendidos)
         except Exception:
             logging.error('解析发生错误的链接：%s' % response.meta.get('show_url'))
             traceback.print_exc()

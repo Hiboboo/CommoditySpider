@@ -52,11 +52,11 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'CommoditySpider.pipelines.CommodityspiderPipeline': 300,
+    # 'CommoditySpider.pipelines.CommodityspiderPipeline': 300,
 }
 
 LOG_LEVEL = 'INFO'
-LOG_FILE = "spider-0604-001.log"
+LOG_FILE = "spider-1106-001.log"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
