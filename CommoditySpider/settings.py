@@ -37,7 +37,7 @@ DEFAULT_REQUEST_HEADERS = {
 # Enable or disable downloader middlewares
 # See https://doc.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-    # 'CommoditySpider.middlewares.CommodityspiderDownloaderMiddleware': 543,
+    'CommoditySpider.middlewares.CommodityspiderDownloaderMiddleware': 543,
     'scrapy.contrib.downloadermiddleware.useragent.UserAgentMiddleware': None,
     'CommoditySpider.middlewares.RandomUserAgentMiddleware': 400,
     'scrapy.downloadermiddlewares.ajaxcrawl.AjaxCrawlMiddleware': 560,
@@ -52,11 +52,11 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    # 'CommoditySpider.pipelines.CommodityspiderPipeline': 300,
+    'CommoditySpider.pipelines.CommodityspiderPipeline': 300,
 }
 
 LOG_LEVEL = 'INFO'
-LOG_FILE = "spider-1106-001.log"
+LOG_FILE = "spider-1107-002.log"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True

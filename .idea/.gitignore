@@ -1,0 +1,10 @@
+# Default ignored files
+/workspace.xml
+.idea/
+/CommoditySpider.iml
+/vcs.xml
+/codeStyles/codeStyleConfig.xml
+/encodings.xml
+/misc.xml
+/modules.xml
+/inspectionProfiles/profiles_settings.xml

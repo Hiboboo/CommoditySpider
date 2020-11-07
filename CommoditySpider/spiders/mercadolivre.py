@@ -18,7 +18,9 @@ class MercadoLivreSpider(scrapy.Spider):
         # 全部分类
         'https://www.mercadolivre.com.br/categorias#menu=categories',
         # 搜索指定目标
-        'https://lista.mercadolivre.com.br/vela#D[A:Vela]'
+        'https://lista.mercadolivre.com.br/acessorios-para-notebook#D[A:acessorios para notebook]',
+        'https://lista.mercadolivre.com.br/sexuais#D[A:sexuais]',
+        'https://lista.mercadolivre.com.br/sexual#D[A:Sexual]',
     ]
     allowed_domain = ['mercadolivre.com.br']
 
@@ -75,7 +77,7 @@ class MercadoLivreSpider(scrapy.Spider):
                     }, dont_filter=True)
 
     # 需要爬取的二级分类
-    target_second_categorys = ['Periféricos para PC']
+    target_second_categorys = ['Periféricos para PC', 'Impressão', 'Conectividade e Redes']
 
     def parse_departments_to_second(self, response):
         """
@@ -156,26 +158,23 @@ class MercadoLivreSpider(scrapy.Spider):
         soup = BeautifulSoup(response.text, 'lxml')
         try:
             meta = response.meta
-
             cls_id = meta.get('meta').get('cls_id')
-            main_tag = soup.find('div', id='root-app')
-            if not main_tag is None:
-                id = main_tag.find('div', class_='ui-pdp-actions__container').find('input', name='item_id')['value']
-                title = soup.find('h1', class_='ui-pdp-title')
+            div_tag = soup.find('div', class_='ui-vip-core')
+            if not div_tag is None:
+                form_div_tag = div_tag.find('div', class_='ui-pdp-actions__container')
+                id = form_div_tag.find('input', attrs={'name': 'item_id'})['value']
+                title = div_tag.find('h1', class_='ui-pdp-title')
                 name = str(title.text).strip() if title is not None else '- -'
                 thumbnail = meta.get('thumbnail')
-                print(id, name, thumbnail)
-                # url = soup.find('input', attrs={'name': 'itemPermalink'})['value']
-                # price_tag = soup.find('span', class_='price-tag').find('span', class_='price-tag-symbol')
-                # price_symbol = price_tag.text
-                # price = price_tag['content']
-                # ven_tag = soup.find('div', class_='item-conditions')
-                # vendidos_text = ven_tag.text if ven_tag is not None else '0'
-                # vendidos = re.findall('\\d+', vendidos_text)[0] if len(re.findall('\\d+', vendidos_text)) > 0 else 0
-                # mon_ven_tag = soup.find('dd', class_='reputation-relevant')
-                # month_vendidos = mon_ven_tag.find('strong').text if mon_ven_tag is not None else 0
-                # yield self.generate_commodity(cls_id, id, name, thumbnail, url, price_symbol, price, vendidos,
-                #                               month_vendidos)
+                url = meta['show_url']
+                price_symbol = div_tag.find('span', class_='price-tag-symbol').text
+                price = div_tag.find('meta', attrs={'itemprop': 'price'})['content']
+                ven_tag = div_tag.find('span', class_='ui-pdp-subtitle')
+                vendidos_text = ven_tag.text if ven_tag is not None else '0'
+                vendidos = re.findall('\\d+', vendidos_text)[0] if len(re.findall('\\d+', vendidos_text)) > 0 else 0
+                mon_ven_tag = div_tag.find('strong', class_='ui-pdp-seller__sales-description')
+                month_vendidos = mon_ven_tag.text if mon_ven_tag is not None else 0
+                yield self.generate_commodity(cls_id, id, name, thumbnail, url, price_symbol, price, vendidos, month_vendidos)
         except Exception:
             logging.error('解析发生错误的链接：%s' % response.meta.get('show_url'))
             traceback.print_exc()
